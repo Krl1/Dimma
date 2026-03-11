@@ -1,6 +1,7 @@
 from typing import Tuple
 
 import albumentations as A
+from albumentations.augmentations.pixel.functional import equalize
 import numpy as np
 import cv2
 import torch
@@ -70,7 +71,12 @@ class PairedTransformForDimma:
             dark, light = self.common_horizontal_flip(image, target)
             dark, light = self.common_random_crop(dark, light)
         else:
-            dark, light = image, target
+            h, w = image.shape[:2]
+            th, tw = self.crop_size
+            i = int(round((h - th) / 2.))
+            j = int(round((w - tw) / 2.))
+            dark = image[i:i+th, j:j+tw]
+            light = target[i:i+th, j:j+tw]
 
         # get color map and luminance of image
         R, L = retinex_decomposition(dark / 255.0)
@@ -79,7 +85,7 @@ class PairedTransformForDimma:
         R_target, L_target = retinex_decomposition(light / 255.0)
 
         # histogram equalization for image
-        hist_eq = A.augmentations.functional.equalize(dark) / 255.0
+        hist_eq = equalize(dark) / 255.0
 
         # concatenate and normalize all channels
         dark = np.concatenate([dark / 255.0, hist_eq, R, L[:, :, None]], axis=2).transpose(2, 0, 1)

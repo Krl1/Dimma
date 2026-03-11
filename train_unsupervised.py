@@ -5,7 +5,7 @@ from omegaconf import OmegaConf
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
-from src.datasets import MixHQDataModule  # noqa: I900
+from src.datasets import MixHQDataModule, CECDataModule  # noqa: I900
 from src.models import LitDimma # noqa: I900
 
 
@@ -18,7 +18,10 @@ if __name__ == "__main__":
 
     pl.seed_everything(conf.seed)
 
-    dm = MixHQDataModule(config=conf.dataset)
+    if conf.dataset.name == "MixHQ":
+        dm = MixHQDataModule(config=conf.dataset)
+    elif conf.dataset.name == "CEC":
+        dm = CECDataModule(config=conf.dataset)
 
     model = LitDimma(config=conf)
 

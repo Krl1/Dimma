@@ -7,7 +7,7 @@ import torchmetrics
 import einops
 import lpips
 from torchvision.utils import save_image
-from diffusers.models.unet_2d import UNet2DModel
+from diffusers import UNet2DModel
 from torch.nn.functional import sigmoid, tanh
 
 from src.utils import get_loss, get_optimizers  # noqa: I900

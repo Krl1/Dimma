@@ -203,7 +203,7 @@ class MDNTransform:
         dark = (255 * 3 * L_dimmed * R_dimmed).astype(np.uint8)
 
         # histogram equalization
-        hist = A.augmentations.functional.equalize(dark) / 255.0
+        hist = A.augmentations.pixel.functional.equalize(dark) / 255.0
 
         # color mapping
         c_map = dark / (dark.sum(axis=2, keepdims=True) + 1e-4)

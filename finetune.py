@@ -5,7 +5,7 @@ from omegaconf import OmegaConf
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
-from src.datasets import LOLDataModule, FSDDataModule  # noqa: I900
+from src.datasets import LOLDataModule, FSDDataModule, CECDataModule  # noqa: I900
 from src.models import LitDimma  # noqa: I900
 
 if __name__ == "__main__":
@@ -21,6 +21,8 @@ if __name__ == "__main__":
         dm = LOLDataModule(config=cfg.dataset)
     elif cfg.dataset.name == "FSD":
         dm = FSDDataModule(config=cfg.dataset)
+    elif cfg.dataset.name == "CEC":
+        dm = CECDataModule(config=cfg.dataset)
 
     # model = LitDimma(config=cfg)
     model = LitDimma.load_from_checkpoint(cfg.model.checkpoint, config=cfg)
