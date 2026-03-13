@@ -2,7 +2,7 @@ name: "dimma-cec-ft"
 
 dataset:
   name: "CEC"
-  path: "../../datasets/cec_dataset"
+  path: "../../datasets/cec_dataset_only_dim"
   unsupervised: False
   num_workers: 8
   pin_memory: False
@@ -11,7 +11,6 @@ dataset:
     image_size: 256
     flip_prob: 0.5
   batch_size: 4
-  limit: 100 # Liczba par do fine-tuningu
 
 model:
   channels: 
@@ -28,7 +27,7 @@ model:
   ssim_loss: True
   ssim_loss_weight: 0.1
   head: "sig_dim"
-  checkpoint: "checkpoints/dimma-cec-stage1/dimma-cec-stage1.ckpt"
+  checkpoint: "checkpoints/dimma-cec-stage1/dimma-cec-stage1-v2.ckpt"
 
 optimizer:
   name: "adam"

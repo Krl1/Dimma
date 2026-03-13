@@ -55,94 +55,95 @@ class MDN(nn.Module):
         )
 
         self.red_mu = nn.Conv2d(latent_dim, K, kernel_size=1)
-        self.red_sigma = nn.Sequential(nn.Conv2d(latent_dim, K, kernel_size=1), nn.Softplus())
-        self.red_pi = nn.Sequential(nn.Conv2d(latent_dim, K, kernel_size=1), nn.Softmax())
+        self.red_sigma = nn.Conv2d(latent_dim, K, kernel_size=1)
+        self.red_pi = nn.Conv2d(latent_dim, K, kernel_size=1)
 
         self.green_mu = nn.Conv2d(latent_dim, K, kernel_size=1)
-        self.green_sigma = nn.Sequential(nn.Conv2d(latent_dim, K, kernel_size=1), nn.Softplus())
-        self.green_pi = nn.Sequential(nn.Conv2d(latent_dim, K, kernel_size=1), nn.Softmax())
+        self.green_sigma = nn.Conv2d(latent_dim, K, kernel_size=1)
+        self.green_pi = nn.Conv2d(latent_dim, K, kernel_size=1)
 
         self.blue_mu = nn.Conv2d(latent_dim, K, kernel_size=1)
-        self.blue_sigma = nn.Sequential(nn.Conv2d(latent_dim, K, kernel_size=1), nn.Softplus())
-        self.blue_pi = nn.Sequential(nn.Conv2d(latent_dim, K, kernel_size=1), nn.Softmax())
+        self.blue_sigma = nn.Conv2d(latent_dim, K, kernel_size=1)
+        self.blue_pi = nn.Conv2d(latent_dim, K, kernel_size=1)
 
     def forward(self, x):
         latent = self.backbone(x)
-        red_mu = self.red_mu(latent) + 1*x[:, 0, ...].unsqueeze(1)
-        red_sigma = self.red_sigma(latent)
-        red_pi = self.red_pi(latent)
+        
+        def get_mdn_params(mu_layer, sigma_layer, pi_layer, ch):
+            mu = mu_layer(latent) + x[:, ch, ...].unsqueeze(1)
+            sigma = F.softplus(sigma_layer(latent)) + 1e-4
+            log_pi = F.log_softmax(pi_layer(latent), dim=1)
+            return mu, sigma, log_pi
 
-        green_mu = self.green_mu(latent) + 1*x[:, 1, ...].unsqueeze(1)
-        green_sigma = self.green_sigma(latent)
-        green_pi = self.green_pi(latent)
+        red_mu, red_sigma, red_log_pi = get_mdn_params(self.red_mu, self.red_sigma, self.red_pi, 0)
+        green_mu, green_sigma, green_log_pi = get_mdn_params(self.green_mu, self.green_sigma, self.green_pi, 1)
+        blue_mu, blue_sigma, blue_log_pi = get_mdn_params(self.blue_mu, self.blue_sigma, self.blue_pi, 2)
 
-        blue_mu = self.blue_mu(latent) + 1*x[:, 2, ...].unsqueeze(1)
-        blue_sigma = self.blue_sigma(latent)
-        blue_pi = self.blue_pi(latent)
+        return red_mu, red_sigma, red_log_pi, green_mu, green_sigma, green_log_pi, blue_mu, blue_sigma, blue_log_pi
 
-        return red_mu, red_sigma, red_pi, green_mu, green_sigma, green_pi, blue_mu, blue_sigma, blue_pi
-
-    def sample_channel(self, mu, sigma, pi):
-        pi = torch.distributions.Categorical(pi).sample()
-        mu = mu[torch.arange(mu.shape[0]), pi]
-        sigma = sigma[torch.arange(sigma.shape[0]), pi]
+    def sample_channel(self, mu, sigma, log_pi):
+        pi = torch.exp(log_pi)
+        pi = pi / pi.sum(dim=-1, keepdim=True) # ensure it sums to 1
+        pi_idx = torch.distributions.Categorical(pi).sample()
+        mu = mu[torch.arange(mu.shape[0]), pi_idx]
+        sigma = sigma[torch.arange(sigma.shape[0]), pi_idx]
         return torch.distributions.Normal(mu, sigma).sample()
 
     def sample(self, x):
         height, width = x.shape[2:]
-        red_mu, red_sigma, red_pi, green_mu, green_sigma, green_pi, blue_mu, blue_sigma, blue_pi = self.forward(x)
+        red_mu, red_sigma, red_log_pi, green_mu, green_sigma, green_log_pi, blue_mu, blue_sigma, blue_log_pi = self.forward(x)
 
         red = rearrange(self.sample_channel(
             rearrange(red_mu, 'b c h w -> (b h w) c'),
             rearrange(red_sigma, 'b c h w -> (b h w) c'),
-            rearrange(red_pi, 'b c h w -> (b h w) c')
+            rearrange(red_log_pi, 'b c h w -> (b h w) c')
         ), '(b h w) -> b h w', b=x.shape[0], h=height, w=width)
 
         green = rearrange(self.sample_channel(
             rearrange(green_mu, 'b c h w -> (b h w) c'),
             rearrange(green_sigma, 'b c h w -> (b h w) c'),
-            rearrange(green_pi, 'b c h w -> (b h w) c')
+            rearrange(green_log_pi, 'b c h w -> (b h w) c')
         ), '(b h w) -> b h w', b=x.shape[0], h=height, w=width)
 
         blue = rearrange(self.sample_channel(
             rearrange(blue_mu, 'b c h w -> (b h w) c'),
             rearrange(blue_sigma, 'b c h w -> (b h w) c'),
-            rearrange(blue_pi, 'b c h w -> (b h w) c')
+            rearrange(blue_log_pi, 'b c h w -> (b h w) c')
         ), '(b h w) -> b h w', b=x.shape[0], h=height, w=width)
 
         return torch.stack((red, green, blue), dim=1)
 
-    def loglik(self, mu, sigma, pi, y):
+    def loglik(self, mu, sigma, log_pi, y):
         z_score = (y - mu) / sigma
         normal_loglik = (
             -0.5 * torch.einsum("bij,bij->bi", z_score, z_score)
             -torch.sum(torch.log(sigma), dim=-1)
         )
 
-        output = torch.logsumexp(torch.log(pi) + normal_loglik.unsqueeze(0), dim=-1)
+        output = torch.logsumexp(log_pi + normal_loglik, dim=-1)
         return -output
 
     def loss(self, x, y):
-        red_mu, red_sigma, red_pi, green_mu, green_sigma, green_pi, blue_mu, blue_sigma, blue_pi = self.forward(x)
+        red_mu, red_sigma, red_log_pi, green_mu, green_sigma, green_log_pi, blue_mu, blue_sigma, blue_log_pi = self.forward(x)
 
         loglik_red = self.loglik(
             rearrange(red_mu, 'b c h w -> (b h w) c 1'), 
             rearrange(red_sigma, 'b c h w -> (b h w) c 1'),
-            rearrange(red_pi, 'b c h w -> (b h w) c'),
+            rearrange(red_log_pi, 'b c h w -> (b h w) c'),
             rearrange(y[:, 0, ...], 'b h w -> (b h w) 1 1')
         )
 
         loglik_green = self.loglik(
             rearrange(green_mu, 'b c h w -> (b h w) c 1'),
             rearrange(green_sigma, 'b c h w -> (b h w) c 1'),
-            rearrange(green_pi, 'b c h w -> (b h w) c'),
+            rearrange(green_log_pi, 'b c h w -> (b h w) c'),
             rearrange(y[:, 1, ...], 'b h w -> (b h w) 1 1')
         )
 
         loglik_blue = self.loglik(
             rearrange(blue_mu, 'b c h w -> (b h w) c 1'),
             rearrange(blue_sigma, 'b c h w -> (b h w) c 1'),
-            rearrange(blue_pi, 'b c h w -> (b h w) c'),
+            rearrange(blue_log_pi, 'b c h w -> (b h w) c'),
             rearrange(y[:, 2, ...], 'b h w -> (b h w) 1 1')
         )
 

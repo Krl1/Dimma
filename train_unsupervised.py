@@ -2,8 +2,9 @@ import argparse
 import json
 import pytorch_lightning as pl
 from omegaconf import OmegaConf
+
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger
+from src.wandb_logger import WandbLoggerWithCache
 
 from src.datasets import MixHQDataModule, CECDataModule  # noqa: I900
 from src.models import LitDimma # noqa: I900
@@ -40,28 +41,31 @@ if __name__ == "__main__":
     ]
 
     # uncomment to use wandb
-    """
-    logger = WandbLogger(
-        entity="your-entity", 
-        project="dimma", 
+    logger = WandbLoggerWithCache(
+        entity="biocam", 
+        project="Dimma-unsupervised", 
         name=conf.name,
         save_dir="logs",
+        tags=[conf.dataset.name, conf.model.head, "unsupervised"],
+        group=f"stage1-{conf.dataset.name}"
     )
-    """
 
     trainer = pl.Trainer(
         accelerator=conf.device,
         devices=1,
         callbacks=callbacks,
-        # logger=logger, # uncomment to use wandb
+        logger=logger, # use wandb
         max_steps=conf.iter,
         val_check_interval=conf.eval_freq,
+        log_every_n_steps=10, 
     )
+    print(f"🚀 Starting training: {conf.name}")
     trainer.fit(model, dm)
+    print(f"✅ Training finished. Best model: {trainer.checkpoint_callback.best_model_path}")
 
     # load best model
     model = LitDimma.load_from_checkpoint(
-        trainer.checkpoint_callback.best_model_path, config=conf
+        trainer.checkpoint_callback.best_model_path, config=conf, weights_only=False
     )
 
     # test

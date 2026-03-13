@@ -23,7 +23,7 @@ class PairedTransformForDimma:
 
     def __init__(self, flip_prob=0.5, crop_size=None, test=False):
         if crop_size is None:
-            crop_size = 256
+            crop_size = 416
 
         self.flip_prob = flip_prob
         self.crop_size = (crop_size, crop_size)

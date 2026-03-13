@@ -3,7 +3,7 @@ import json
 import pytorch_lightning as pl
 from omegaconf import OmegaConf
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger
+from src.wandb_logger import WandbLoggerWithCache
 
 from src.datasets import LOLDataModule, FSDDataModule, CECDataModule  # noqa: I900
 from src.models import LitDimma  # noqa: I900
@@ -25,7 +25,7 @@ if __name__ == "__main__":
         dm = CECDataModule(config=cfg.dataset)
 
     # model = LitDimma(config=cfg)
-    model = LitDimma.load_from_checkpoint(cfg.model.checkpoint, config=cfg)
+    model = LitDimma.load_from_checkpoint(cfg.model.checkpoint, config=cfg, weights_only=False)
 
     callbacks = [
         pl.callbacks.progress.TQDMProgressBar(),
@@ -42,31 +42,35 @@ if __name__ == "__main__":
     ]
 
     # uncomment to use wandb
-    """
-    logger = WandbLogger(
-        entity="your-entity", 
-        project="dimma", 
-        name=cfg.name
+    logger = WandbLoggerWithCache(
+        entity="biocam", 
+        project="Dimma-finetune", 
+        name=cfg.name,
+        save_dir="logs",
+        tags=[cfg.dataset.name, cfg.model.head, "finetune"],
+        group=f"stage2-{cfg.dataset.name}"
     )
-    """
 
     trainer = pl.Trainer(
         accelerator=cfg.device,
         devices=1,
         callbacks=callbacks,
-        # logger=logger, # uncomment to use wandb
+        logger=logger, # use wandb
         max_steps=cfg.iter,
         check_val_every_n_epoch=None,
         val_check_interval=cfg.eval_freq,
+        log_every_n_steps=10,
     )
 
+    print(f"🚀 Starting finetuning: {cfg.name}")
     trainer.validate(model, datamodule=dm)
 
     trainer.fit(model, dm)
+    print(f"✅ Finetuning finished. Best model: {trainer.checkpoint_callback.best_model_path}")
 
     # load best model
     model = LitDimma.load_from_checkpoint(
-        trainer.checkpoint_callback.best_model_path, config=cfg
+        trainer.checkpoint_callback.best_model_path, config=cfg, weights_only=False
     )
 
     # test

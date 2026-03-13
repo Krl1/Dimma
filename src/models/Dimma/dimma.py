@@ -1,9 +1,10 @@
 from pathlib import Path
-
 import wandb
 import pytorch_lightning as pl
 import torch
+
 import torchmetrics
+
 import einops
 import lpips
 from torchvision.utils import save_image
@@ -107,22 +108,27 @@ class LitDimma(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         _, predictions = self.shared_step(batch)
-
+        
         self.val_psnr(predictions, batch["target"])
-        self.log("test/psnr", self.val_psnr, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("test/psnr", self.val_psnr, on_step=False, on_epoch=True)
         self.val_ssim(predictions, batch["target"])
-        self.log("test/ssim", self.val_ssim, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("test/ssim", self.val_ssim, on_step=False, on_epoch=True)
 
-        if self.logger:
-            for i in range(min(self.config.model.save_images, predictions.size(0))):
-                self.logger.experiment.log(
-                    {
-                        f"imgs/image_{i + (batch_idx*self.config.dataset.batch_size)}": [
-                            wandb.Image(batch["target"][i]),
-                            wandb.Image(predictions[i]),
-                        ]
-                    }
-                )
+        if not hasattr(self, "test_table_data"):
+            self.test_table_data = []
+        if len(self.test_table_data) < self.config.model.save_images:
+            for i in range(min(predictions.size(0), self.config.model.save_images - len(self.test_table_data))):
+                self.test_table_data.append([
+                    batch_idx + i, 
+                    wandb.Image(batch["target"][i]), 
+                    wandb.Image(predictions[i])
+                ])
+    def on_test_epoch_end(self):
+        if self.logger and hasattr(self, "test_table_data"):
+            columns = ["id", "ground_truth", "prediction"]
+            # Używamy ujednoliconego kroku, żeby nie "rozsuwać" wykresów
+            self.logger.log_table(key="test/results_table", columns=columns, data=self.test_table_data)
+            self.test_table_data = [] 
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         prediction, _ = self(

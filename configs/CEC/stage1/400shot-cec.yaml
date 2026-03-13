@@ -1,4 +1,4 @@
-name: "dimma-cec-stage1"
+name: "dimma-400shot-cec-stage1"
 
 dataset:
   name: "CEC"
@@ -8,8 +8,8 @@ dataset:
   pin_memory: False
   transform: 
     name: "mdn"
-    image_size: 256
-    path: "dimmers/100shot-new/"
+    image_size: 416
+    path: "dimmers/400shot-new/"
     dim_factor: 
       - 0.3
       - 2.0

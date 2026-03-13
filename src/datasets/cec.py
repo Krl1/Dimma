@@ -73,9 +73,32 @@ class CECDataModule(pl.LightningDataModule):
             transform=self.test_transform,
             unsupervised=False # Walidacja zawsze na rzeczywistych spinach
         )
+        self.test_ds = self.val_ds
 
     def train_dataloader(self):
-        return DataLoader(self.train_ds, batch_size=self.config.batch_size, num_workers=self.config.num_workers, shuffle=True)
+        return DataLoader(
+            self.train_ds, 
+            batch_size=self.config.batch_size, 
+            num_workers=self.config.num_workers, 
+            shuffle=True,
+            pin_memory=self.config.get('pin_memory', False)
+        )
 
     def val_dataloader(self):
-        return DataLoader(self.val_ds, batch_size=1, num_workers=self.config.num_workers)
+        return DataLoader(
+            self.val_ds, 
+            batch_size=1, 
+            num_workers=self.config.num_workers,
+            pin_memory=self.config.get('pin_memory', False)
+        )
+
+    def test_dataloader(self):
+        return DataLoader(
+            self.test_ds, 
+            batch_size=1, 
+            num_workers=self.config.num_workers,
+            pin_memory=self.config.get('pin_memory', False)
+        )
+
+    def predict_dataloader(self):
+        return self.test_dataloader()

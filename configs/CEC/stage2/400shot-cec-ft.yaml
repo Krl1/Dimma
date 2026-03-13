@@ -1,19 +1,15 @@
-name: "dimma-cec-stage1"
+name: "dimma-400shot-cec-ft"
 
 dataset:
   name: "CEC"
   path: "../../datasets/cec_dataset_only_dim"
-  unsupervised: True
+  unsupervised: False
   num_workers: 8
   pin_memory: False
   transform: 
-    name: "mdn"
-    image_size: 256
-    path: "dimmers/100shot-new/"
-    dim_factor: 
-      - 0.3
-      - 2.0
-    mdn: True
+    name: "dimma_finetune"
+    image_size: 416
+    flip_prob: 0.5
   batch_size: 4
 
 model:
@@ -31,6 +27,7 @@ model:
   ssim_loss: True
   ssim_loss_weight: 0.1
   head: "sig_dim"
+  checkpoint: "checkpoints/dimma-400shot-cec-stage1/dimma-400shot-cec-stage1.ckpt"
 
 optimizer:
   name: "adam"
@@ -51,6 +48,6 @@ logger:
   save_top_k: 1
 
 device: "gpu"
-iter: 5_000
+iter: 2_000
 eval_freq: 100
 seed: 42
