@@ -14,7 +14,7 @@ def main():
     config_path = "configs/CEC/stage2/400shot-cec-ft.yaml"
     checkpoint_path = "checkpoints/dimma-400shot-cec-ft/dimma-400shot-cec-ft.ckpt"
     test_csv_path = "../../datasets/cec_dataset_only_dim/test.csv"
-    output_dir = "../../results/dimma"
+    output_dir = "../../results/Dimma"
     images_output_dir = os.path.join(output_dir, "images")
     results_csv_path = os.path.join(output_dir, "results.csv")
 

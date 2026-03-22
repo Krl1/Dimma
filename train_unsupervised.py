@@ -43,7 +43,7 @@ if __name__ == "__main__":
     # uncomment to use wandb
     logger = WandbLoggerWithCache(
         entity="biocam", 
-        project="Dimma-unsupervised", 
+        project="Dimma-unsupervised",
         name=conf.name,
         save_dir="logs",
         tags=[conf.dataset.name, conf.model.head, "unsupervised"],
